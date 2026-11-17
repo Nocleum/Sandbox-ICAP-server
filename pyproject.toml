@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sandbox-icap-decrypt"
+version = "1.0.0"
+description = "A small ICAP RESPMOD server that decrypts ENC1 AES-256-GCM bodies"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["cryptography>=42.0.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+sandbox-icap = "sandbox_icap.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["sandbox_icap*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
