@@ -8,6 +8,7 @@ from sandbox_icap.errors import InvalidContainer
 
 
 def test_decrypts_enc1_binary_plaintext() -> None:
+    """Проверить расшифровку ENC1 с произвольными бинарными данными."""
     plaintext = b"\x00\xff\x80binary\r\n\x00payload"
     nonce = bytes(range(12))
     encrypted = AESGCM(TEST_KEY).encrypt(nonce, plaintext, None)
@@ -17,6 +18,7 @@ def test_decrypts_enc1_binary_plaintext() -> None:
 
 
 def test_accepts_empty_plaintext_container() -> None:
+    """Проверить допустимость контейнера с пустым открытым текстом."""
     nonce = b"n" * 12
     encrypted = AESGCM(TEST_KEY).encrypt(nonce, b"", None)
     container = b"ENC1" + nonce + encrypted
@@ -30,11 +32,13 @@ def test_accepts_empty_plaintext_container() -> None:
     [b"ENC1", b"ENC1" + b"n" * 12 + b"short"],
 )
 def test_rejects_truncated_container(container: bytes) -> None:
+    """Проверить отклонение неполного ENC1-контейнера."""
     with pytest.raises(InvalidContainer):
         decrypt_enc1_body(container)
 
 
 def test_rejects_modified_tag() -> None:
+    """Проверить отклонение контейнера с изменённым тегом аутентификации."""
     nonce = bytes(range(12))
     encrypted = AESGCM(TEST_KEY).encrypt(nonce, b"plaintext", None)
     container = bytearray(b"ENC1" + nonce + encrypted)
@@ -45,5 +49,6 @@ def test_rejects_modified_tag() -> None:
 
 
 def test_rejects_wrong_key_length() -> None:
+    """Проверить отклонение ключа AES-GCM неподдерживаемой длины."""
     with pytest.raises(ValueError):
         decrypt_enc1_body(b"ENC1" + b"x" * 28, b"short")

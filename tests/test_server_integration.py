@@ -13,6 +13,7 @@ def _parse_http(
     payload: bytes,
     headers: dict[bytes, bytes],
 ) -> tuple[bytes, bytes]:
+    """Выделить HTTP-заголовки и восстановить тело из ICAP-чанков."""
     assert b"res-hdr=0, res-body=" in headers[b"encapsulated"]
     offset = int(headers[b"encapsulated"].split(b"res-body=", 1)[1])
     http_headers = payload[:offset]
@@ -21,6 +22,7 @@ def _parse_http(
 
 
 def test_unencrypted_body_is_returned_unchanged(running_server) -> None:
+    """Проверить, что обычное бинарное тело возвращается без изменений."""
     body = b"\x00\xff\x80plain\r\ndata"
     request = make_request(body, chunk_sizes=[1, 2, 3, 1, 4])
     response = transact(running_server, request)
@@ -41,6 +43,7 @@ def test_unencrypted_body_is_returned_unchanged(running_server) -> None:
 def test_decrypts_container_split_across_arbitrary_chunks(
     running_server,
 ) -> None:
+    """Проверить расшифровку ENC1, разделённого между разными чанками."""
     plaintext = b"\x00binary\xffpayload\r\nwith arbitrary bytes"
     encrypted_body = encrypt_container(plaintext)
     # Границы частей пересекают маркер ENC1, nonce, ciphertext и tag.
@@ -60,6 +63,7 @@ def test_decrypts_container_split_across_arbitrary_chunks(
 
 
 def test_empty_plaintext_is_valid(running_server) -> None:
+    """Проверить успешную обработку контейнера с пустым plaintext."""
     encrypted_body = encrypt_container(b"")
     chunk_sizes = [4, 12, 1, 1, 1, 1, 12]
     request = make_request(encrypted_body, chunk_sizes=chunk_sizes)
@@ -74,6 +78,7 @@ def test_empty_plaintext_is_valid(running_server) -> None:
 
 
 def test_short_enc1_container_returns_4xx_with_istag(running_server) -> None:
+    """Проверить ответ 4xx и наличие ISTag для короткого ENC1-контейнера."""
     response = transact(running_server, make_request(b"ENC1too-short"))
     status, headers, payload, _ = parse_icap_response(response)
 
@@ -84,6 +89,7 @@ def test_short_enc1_container_returns_4xx_with_istag(running_server) -> None:
 
 
 def test_authentication_failure_returns_4xx(running_server) -> None:
+    """Проверить ответ 4xx при ошибке проверки тега аутентификации."""
     encrypted_body = bytearray(encrypt_container(b"secret"))
     encrypted_body[-1] ^= 0x80
     response = transact(running_server, make_request(bytes(encrypted_body)))
@@ -94,6 +100,7 @@ def test_authentication_failure_returns_4xx(running_server) -> None:
 
 
 def test_content_length_mismatch_returns_4xx(running_server) -> None:
+    """Проверить отклонение HTTP-тела с неверным Content-Length."""
     body = b"abc"
     headers = (
         b"HTTP/1.1 200 OK\r\n"
@@ -108,6 +115,7 @@ def test_content_length_mismatch_returns_4xx(running_server) -> None:
 
 
 def test_large_response_is_chunked_and_binary_safe(running_server) -> None:
+    """Проверить передачу большого тела с любыми значениями байтов."""
     body = bytes(range(256)) * 100
     response = transact(
         running_server,
@@ -121,6 +129,7 @@ def test_large_response_is_chunked_and_binary_safe(running_server) -> None:
 
 
 def test_request_can_arrive_in_small_tcp_writes(running_server) -> None:
+    """Проверить разбор запроса, поступающего небольшими TCP-фрагментами."""
     body = encrypt_container(b"fragmented TCP write")
     request = make_request(body, chunk_sizes=[1] * len(body))
     fragments = [request[i:i + 3] for i in range(0, len(request), 3)]
@@ -133,6 +142,7 @@ def test_request_can_arrive_in_small_tcp_writes(running_server) -> None:
 
 
 def test_server_continues_after_bad_container(running_server) -> None:
+    """Проверить работу сервера после обработки некорректного контейнера."""
     bad_response = transact(running_server, make_request(b"ENC1bad"))
     assert parse_icap_response(bad_response)[0].startswith(b"ICAP/1.0 4")
 
@@ -146,6 +156,7 @@ def test_server_continues_after_bad_container(running_server) -> None:
 
 
 def test_wrong_service_path_returns_404(running_server) -> None:
+    """Проверить ответ 404 для URI неизвестного ICAP-сервиса."""
     request = make_request(b"abc", uri="icap://127.0.0.1/other")
     response = transact(running_server, request)
     status, headers, _, _ = parse_icap_response(response)
@@ -155,6 +166,7 @@ def test_wrong_service_path_returns_404(running_server) -> None:
 
 
 def test_non_respmod_method_returns_405(running_server) -> None:
+    """Проверить запрет ICAP-метода, отличного от RESPMOD."""
     request = make_request(b"abc", method="REQMOD")
     response = transact(running_server, request)
     status, _, _, _ = parse_icap_response(response)
@@ -163,6 +175,7 @@ def test_non_respmod_method_returns_405(running_server) -> None:
 
 
 def test_malformed_icap_chunk_size_returns_4xx(running_server) -> None:
+    """Проверить ответ 4xx при некорректном HEX-размере ICAP-чанка."""
     request = make_request(b"abc")
     malformed_request = request.replace(
         b"3\r\nabc\r\n",

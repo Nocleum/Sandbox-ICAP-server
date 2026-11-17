@@ -14,6 +14,7 @@ def encrypt_container(
     plaintext: bytes,
     nonce: bytes = bytes(range(12)),
 ) -> bytes:
+    """Создать тестовый ENC1-контейнер с заданным открытым текстом."""
     encrypted = AESGCM(TEST_KEY).encrypt(nonce, plaintext, None)
     return b"ENC1" + nonce + encrypted
 
@@ -22,6 +23,7 @@ def encode_chunks(
     data: bytes,
     sizes: Iterable[int] | None = None,
 ) -> bytes:
+    """Разбить данные на ICAP-чанки указанных размеров."""
     chunks: list[bytes] = []
     offset = 0
     if sizes is None:
@@ -52,6 +54,7 @@ def make_request(
     uri: str = "icap://127.0.0.1:1344/decrypt",
     method: str = "RESPMOD",
 ) -> bytes:
+    """Сформировать ICAP RESPMOD-запрос для интеграционного теста."""
     if http_headers is None:
         http_headers = (
             b"HTTP/1.1 200 OK\r\n"
@@ -81,6 +84,7 @@ def transact(
     request: bytes,
     fragments: Iterable[bytes] | None = None,
 ) -> bytes:
+    """Отправить запрос по TCP и прочитать ответ до закрытия соединения."""
     with socket.create_connection(address, timeout=3.0) as client:
         client.settimeout(3.0)
         if fragments is None:
@@ -103,6 +107,7 @@ def transact(
 def parse_icap_response(
     response: bytes,
 ) -> tuple[bytes, dict[bytes, bytes], bytes, bytes]:
+    """Разобрать статус, заголовки и тело ICAP-ответа."""
     header_end = response.find(b"\r\n\r\n")
     assert header_end >= 0, response
 
@@ -118,6 +123,7 @@ def parse_icap_response(
 
 
 def decode_chunks(data: bytes) -> bytes:
+    """Собрать исходные данные из последовательности ICAP-чанков."""
     output = bytearray()
     offset = 0
 
